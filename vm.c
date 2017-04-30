@@ -17,7 +17,10 @@ main(int argc, const char *argv[])
     size_t poolsz;
 
     // VM registers.
-    long *pc, *sp, *bp, cycle;
+    long *pc,       // program counter
+         *sp, *bp,  // stack/base pointer
+         a,         // accumulator
+         cycle;     // cycle count
 
     // States.
     char *data;     // data/bss area
@@ -29,7 +32,7 @@ main(int argc, const char *argv[])
     long *idmain;
 
     // Temps.
-    int i;
+    long i, *t;
 
     // Pop the argv for parsing flags.
     --argc; ++argv; // skip the $0 argument
@@ -76,7 +79,7 @@ main(int argc, const char *argv[])
     // Load source file.
     malloc_seg(lp = p,  char,   poolsz, "source area");
     if ( (i = read(fd, p, poolsz - 1)) <= 0) {
-        printf("read error or EOF: %d returned\n", i);
+        printf("read error or EOF: %ld returned\n", i);
         return -1;
     }
 
@@ -86,6 +89,7 @@ main(int argc, const char *argv[])
     close(fd);
 
     // Parse declarations (of type CHAR, INT, ENUM).
+    // XXX: Declaration and initialization cannot be done simultaneously.
     line = 1;
     next();
     while (tk) {
@@ -217,7 +221,75 @@ main(int argc, const char *argv[])
     // `src' flag: expr() will print source and opcodes.
     if (src) return 0;
 
-    // TODO: Setup stack.
+    // Setup stack.
+    sp = (long *)((long)sp + poolsz); // stack base at highest address
+    *--sp = EXIT;   // calls exit() if main returns
+
+    *--sp = PSH; t = sp;
+    *--sp = argc;
+    *--sp = (long)argv;
+    *--sp = (long)t;
+
+    // Run.
+    cycle = 0;
+    for (;;) {
+        i = *pc++; ++cycle;
+
+        if (debug) {
+            /* TODO */
+        }
+
+        switch (i) {
+            /* Basic instructions. */
+            case ENT:   *--sp = (long)bp; bp = sp; sp -= *pc++;         break;
+            case LEV:   sp = bp; bp = (long *)sp++; pc = (long *)*sp++; break;
+            case LEA:   a = (long)(bp + *pc++);                         break;
+            case IMM:   a = *pc++;                                      break;
+            case JMP:   pc = (long *)*pc;                               break;
+            case JSR:   *--sp = (long)(pc + 1); pc = (long *)*pc;       break;
+            case BZ:    pc = a ? pc + 1 : (long *)pc;                   break;
+            case BNZ:   pc = a ? (long *)pc : pc + 1;                   break;
+            case ADJ:   sp += *pc++;                                    break;
+            case LI:    a = *(long *)a;                                 break;
+            case LC:    a = *(char *)a;                                 break;
+            case SI:    *(long *)*sp++ = a;                             break;
+            case SC:    a = *(char *)+sp++ = a;                         break;
+            case PSH:   *--sp = a;                                      break;
+
+            /* Operations. */
+            case OR:    a = *sp++   |   a;  break;
+            case XOR:   a = *sp++   ^   a;  break;
+            case AND:   a = *sp++   &   a;  break;
+            case EQ:    a = *sp++   ==  a;  break;
+            case NE:    a = *sp++   !=  a;  break;
+            case LT:    a = *sp++   <   a;  break;
+            case GT:    a = *sp++   >   a;  break;
+            case LE:    a = *sp++   <=  a;  break;
+            case GE:    a = *sp++   >=  a;  break;
+            case SHL:   a = *sp++   <<  a;  break;
+            case SHR:   a = *sp++   >>  a;  break;
+            case ADD:   a = *sp++   +   a;  break;
+            case SUB:   a = *sp++   -   a;  break;
+            case MUL:   a = *sp++   *   a;  break;
+            case DIV:   a = *sp++   /   a;  break;
+            case MOD:   a = *sp++   %   a;  break;
+
+            /* System calls and library functions. */
+            case OPEN:  a = open((char *)sp[1], *sp);                   break;
+            case READ:  a = read(sp[2], (char *)sp[1], *sp);            break;
+            case CLOS:  a = close(*sp);                                 break;
+            case PRTF:  t = sp + pc[1];
+                        a = printf((char *)t[-1],
+                                   t[-2], t[-3], t[-4], t[-5], t[-6]);  break;
+            case MALC:  a = (long)malloc(*sp);                          break;
+            case FREE:  free((void *)*sp);  /* safe here */             break;
+            case MSET:  a = (long)memset((char *)sp[2], sp[1], *sp);    break;
+            case MCMP:  a = memcmp((char *)sp[2], (char *)sp[1], *sp);  break;
+            case EXIT:  printf("exit(%ld) cycle=%ld\n", *sp, cycle); return *sp;
+            default:
+                printf("Bad instruction %ld! cycle=%ld\n", i, cycle); return -1;
+        }
+    }
 
     return 0;
 }
