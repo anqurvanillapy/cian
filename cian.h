@@ -31,7 +31,7 @@ enum {
     Eq, Ne, Lt, Gt, Le, Ge,
     Shl, Shr,       // shift left/right
     Add, Sub, Mul, Div, Mod, Inc, Dec,
-    Brak            // open/closed bracket
+    Brak            // break
 };
 
 /// Opcodes.

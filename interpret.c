@@ -153,11 +153,29 @@ expr(int lev)
             break;
         case '!':
             // Unary `!': Return n == 0.
-            next(); expr(Inc); *++e = PSH; *++e = IMM; *++e = EQ; ty = INT;
+            next(); expr(Inc); *++e = PSH; *++e = IMM; *++e = 0; *++e = EQ;
+            ty = INT;
             break;
         case '~':
             // Unary `~': Return n ^ -1 (-1 got all 1s).
+            next(); expr(Inc); *++e = PSH; *++e = IMM; *++e = -1; *++e = XOR;
+            ty = INT;
             break;
-        // TODO
+        case Add:
+            next(); expr(Inc); ty = INT;
+            break;
+        case Sub:
+            next(); *++e = IMM;
+            if (tk == Num) { *++e = -ival; next(); }                // binary
+            else { *++e = -1; *++e = PSH; expr(Inc); *++e = MUL; }  // unary
+            ty = INT;
+            break;
+        case Inc:
+        case Dec:
+            t = tk; next(); expr(Inc);
+            if      (*e == LC) { *e = PSH; *++e = LC; }
+            // TODO
+            break;
+        default: throw_err("Bad expression");
     }
 }
