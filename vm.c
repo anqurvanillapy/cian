@@ -1,8 +1,9 @@
 #include "cian.h"
 
 /// See interpret.c: States.
-extern char *p, *lp;
-extern long tk, ival, loc, *id, *sym;
+extern char *p, *lp, *data;
+extern long *e, *le, tk, ival, ty, loc, *id, *sym;
+extern int line;
 
 int
 main(int argc, const char *argv[])
@@ -22,11 +23,8 @@ main(int argc, const char *argv[])
          a,         // accumulator
          cycle;     // cycle count
 
-    // States.
-    char *data;     // data/bss area
-    long *le, *e,   // current position in emitted code
-         line,
-         ty, bt;    // type and basetype
+    // Basetype.
+    long bt;
 
     // Main function in source file.
     long *idmain;
@@ -38,15 +36,15 @@ main(int argc, const char *argv[])
     --argc; ++argv; // skip the $0 argument
     if (next_flag('S')) { src = true; --argc; ++argv; }
     if (next_flag('d')) { debug = true; --argc; ++argv; }
-    // The following positional arguments are filenames.
-    if (argc < 1) {
-        printf("usage: cian [-S] [-d] file ...\n");
-        return -1;
+    // Emit only one source file.
+    if (argc != 1) {
+        printf("usage: cian [-S] [-d] file\n");
+        exit(-1);
     }
 
     if ( (fd = open(*argv, 0)) < 0) {
         printf("open error: %s", *argv);
-        return -1;
+        exit(-1);
     }
 
     poolsz = 256 * 1024;    // 256 KiB
@@ -80,7 +78,7 @@ main(int argc, const char *argv[])
     malloc_seg(lp = p,  char,   poolsz, "source area");
     if ( (i = read(fd, p, poolsz - 1)) <= 0) {
         printf("read error or EOF: %ld returned\n", i);
-        return -1;
+        exit(-1);
     }
 
     // *p wasn't memset, so guarantee that the long string of the source code
@@ -215,7 +213,7 @@ main(int argc, const char *argv[])
 
     if ( !(pc = (long *)idmain[Val])) {
         printf("main function not defined\n");
-        return -1;
+        exit(-1);
     }
 
     // `src' flag: expr() will print source and opcodes.
@@ -285,9 +283,9 @@ main(int argc, const char *argv[])
             case FREE:  free((void *)*sp);  /* safe here */             break;
             case MSET:  a = (long)memset((char *)sp[2], sp[1], *sp);    break;
             case MCMP:  a = memcmp((char *)sp[2], (char *)sp[1], *sp);  break;
-            case EXIT:  printf("exit(%ld) cycle=%ld\n", *sp, cycle); return *sp;
+            case EXIT:  printf("exit(%ld) cycle=%ld\n", *sp, cycle); exit(*sp);
             default:
-                printf("Bad instruction %ld! cycle=%ld\n", i, cycle); return -1;
+                printf("Bad instruction %ld! cycle=%ld\n", i, cycle); exit(-1);
         }
     }
 

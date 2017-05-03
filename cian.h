@@ -62,29 +62,43 @@ enum {
     EXIT
 };
 
-/// Types.
+/// Types: If ty is even, it is a `long' pointer, or it is a `char' pointer if
+/// it is odd.  The quotient is the pointer level.
 enum { INT, CHAR, PTR };
 
 /// Identifier offsets.
 enum { Tk, Hash, Name, Class, Type, Val, HClass, HType, HVal, Idsz };
 
-/// Utilities.
+/**
+ *  Utilities.
+ */
 
 // Pop next program argument.
 #define next_flag(a)    argc > 0 && **argv == '-' && (*argv)[1] == (a)
+
 // `malloc' `sz'-sized segment.
 #define malloc_seg(seg, type, sz, name) do { \
     if ( (seg = (type *)malloc(sz)) == NULL) { \
         printf("malloc error: " name " (size=%zd)\n", sz); \
-        return -1; \
+        exit(-1); \
     } \
 } while(0)
+
+// Throw an error with line count and messages and exit.
+#define throw_err(errmsg)   do { \
+    printf("%d: " errmsg "\n", line); exit(-1); \
+} while(0)
+
 // `assert' with line count provided.
 #define lassert(expr, errmsg)   do { \
     if (!(expr)) { \
-        printf("%ld: " errmsg "\n", line); return -1; \
+        throw_err(errmsg); \
     } \
 } while(0)
+
+/**
+ *  Interpretation.
+ */
 
 /// Tokenizer.
 void next();
