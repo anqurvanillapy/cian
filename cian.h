@@ -85,8 +85,8 @@ enum { Tk, Hash, Name, Class, Type, Val, HClass, HType, HVal, Idsz };
 } while(0)
 
 // Throw an error with line count and messages and exit.
-#define throw_err(errmsg)   do { \
-    printf("%d: " errmsg "\n", line); exit(-1); \
+#define throw_err(errmsg, args...)   do { \
+    printf("%d: " errmsg "\n", line, ##args); exit(-1); \
 } while(0)
 
 // `assert' with line count provided.

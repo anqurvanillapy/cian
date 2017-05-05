@@ -58,7 +58,7 @@ next()
 }
 
 void
-expr(int lev)
+expr(int lev)   // lev: Level, precedence of an operator
 {
     // Temps.
     long t, *d;
@@ -174,8 +174,79 @@ expr(int lev)
         case Dec:
             t = tk; next(); expr(Inc);
             if      (*e == LC) { *e = PSH; *++e = LC; }
-            // TODO
+            else if (*e == LI) { *e = PSH; *++e = LI; }
+            else    { throw_err("Bad lvalue in pre-increment"); }
+
+            *++e = PSH;
+            // In-/decrement a pointer/variable.
+            *++e = IMM; *++e = (ty > PTR) ? sizeof(long) : sizeof(char);
+            *++e = (t == Inc) ? ADD : SUB;
+            *++e = (ty == CHAR) ? SC : SI;
+
             break;
         default: throw_err("Bad expression");
+    }
+
+    // Precedence climbing (or TDOP).
+    while (tk >= lev) {
+        t = ty;
+
+        switch (tk) {
+            case Assign:
+                next();
+                lassert(*e == LC || *e == LI, "Bad lvalue in assignment");
+                *e = PSH;
+                expr(Assign);
+                *++e = ( (ty = t) == CHAR) ? SC : SI;
+                break;
+            case Cond:
+                next();
+                *++e = BZ; d = ++e;
+                expr(Assign);
+                lassert(tk == ':', "Conditional missing colon");
+                next();
+                *d = (long)(e + 3); *++e = JMP; d = ++e;
+                expr(Cond);
+                *d = (long)(e + 1);
+                break;
+            case Lor:
+                next();
+                *++e = BNZ; d = ++e; expr(Lan); *d = (long)(e + 1);
+                ty = INT; break;
+            case Lan:
+                next();
+                *++e = BZ; d = ++e; expr(Or); *d = (long)(e + 1);
+                ty = INT; break;
+            case Or:
+                next();
+                *++e = PSH; expr(Xor); *++e = OR;
+                ty = INT; break;
+            case Xor:
+                next();
+                *++e = PSH; expr(And); *++e = XOR;
+                ty = INT; break;
+            case And:
+                next();
+                *++e = PSH; expr(Eq); *++e = AND;
+                ty = INT; break;
+            case Eq:
+                next();
+                *++e = PSH; expr(Lt); *++e = EQ;
+                ty = INT; break;
+            case Ne:
+                next();
+                *++e = PSH; expr(Lt); *++e = NE;
+                ty = INT; break;
+            case Lt:
+                next();
+                *++e = PSH; expr(Shl); *++e = LT;
+                ty = INT; break;
+            case Gt:
+                next();
+                *++e = PSH; expr(Shl); *++e = GT;
+                ty = INT; break;
+            // TODO
+            default: throw_err("Token error: tk=%ld", tk);
+        }
     }
 }
