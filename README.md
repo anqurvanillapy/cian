@@ -1,3 +1,7 @@
+<p align="center">
+  <img alt="cian" src="logo.png">
+</p>
+
 # cian
 
 A VM of Cian, a minimal C-like procedural programming language. *Cian* means *C
